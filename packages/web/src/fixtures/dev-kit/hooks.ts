@@ -27,7 +27,18 @@ import {
   allClaimedRewards,
   propertyName,
   propertySymbol,
-  balanceOfProperty
+  balanceOfProperty,
+  detectStokens,
+  getStokenPositions,
+  getStokenRewards,
+  approve,
+  depositToProperty,
+  depositToPosition,
+  withdrawByPosition,
+  migrateToSTokens,
+  getTokenURI,
+  getStokenSymbol,
+  positionsOfOwner
 } from './client'
 import { SWRCachePath } from './cache-path'
 import {
@@ -72,7 +83,7 @@ export const useGetTotalRewardsAmount = (propertyAddress: string) => {
   const { data, error } = useSWR<undefined | UnwrapFunc<typeof getRewardsAmount>, Error>(
     SWRCachePath.getTotalRewardsAmount(propertyAddress, accountAddress),
     () => whenDefined(web3, x => getRewardsAmount(x, propertyAddress)),
-    { onError: err => message.error(err.message) }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return {
     totalRewardsAmount: whenDefined(data, x => toCurrency(toNaturalNumber(toNaturalNumber(x)))),
@@ -120,7 +131,8 @@ export const useGetEstimateGas4WithdrawHolderAmount = (propertyAddress: string) 
     () =>
       whenDefinedAll([web3, accountAddress], ([x, fromAddress]) =>
         getEstimateGas4WithdrawHolderAmount(x, propertyAddress, fromAddress)
-      )
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
     // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
   )
   const { gasPrice } = useGetGasPrice()
@@ -132,15 +144,15 @@ export const useGetEstimateGas4WithdrawHolderAmount = (propertyAddress: string) 
   return { estimateGas, error }
 }
 
-export const useGetMyHolderAmount = (propertyAddress: string) => {
+export const useGetMyHolderAmount = (propertyAddress?: string) => {
   const { nonConnectedWeb3, accountAddress } = useProvider()
   const { data, error } = useSWR<UnwrapFunc<typeof getMyHolderAmount>, Error>(
     SWRCachePath.getMyHolderAmount(propertyAddress, accountAddress),
     () =>
-      whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
-        getMyHolderAmount(client, propertyAddress, account)
+      whenDefinedAll([nonConnectedWeb3, propertyAddress, accountAddress], ([client, property, account]) =>
+        getMyHolderAmount(client, property, account)
       ),
-    { onError: err => message.error(err.message) }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const [withdrawable, , , total] = data || []
   return {
@@ -158,7 +170,7 @@ export const useGetHolderAmountByAddress = (propertyAddress: string, srcAddress?
       whenDefinedAll([nonConnectedWeb3, srcAddress], ([client, account]) =>
         getMyHolderAmount(client, propertyAddress, account)
       ),
-    { onError: err => message.error(err.message) }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const [withdrawable, , , total] = data || []
   return {
@@ -173,7 +185,7 @@ export const useGetTreasuryAmount = (propertyAddress: string) => {
   const { data, error } = useSWR<UnwrapFunc<typeof getTreasuryAmount>, Error>(
     SWRCachePath.getTreasuryAmount(propertyAddress),
     () => whenDefined(nonConnectedWeb3, client => getTreasuryAmount(client, propertyAddress)),
-    { onError: err => message.error(err.message) }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return { treasuryAmount: data ? toNaturalNumber(data) : undefined, error }
 }
@@ -184,23 +196,21 @@ export const useGetTotalStakingAmount = (propertyAddress: string) => {
   const { data, error } = useSWR<UnwrapFunc<typeof getTotalStakingAmount>, Error>(
     SWRCachePath.getTotalStakingAmount(propertyAddress, accountAddress),
     () => whenDefined(nonConnectedWeb3, x => getTotalStakingAmount(x, propertyAddress)),
-    { onError: err => message.error(err.message) }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return { totalStakingAmount: whenDefined(data, x => toCurrency(toNaturalNumber(x))), currency, error }
 }
 
-export const useGetMyStakingRewardAmount = (propertyAddress: string) => {
+export const useGetMyStakingRewardAmount = (propertyAddress?: string) => {
   const { nonConnectedWeb3, accountAddress } = useProvider()
   const { currency, toCurrency } = useCurrency()
   const { data, error } = useSWR<UnwrapFunc<typeof getMyStakingRewardAmount>, Error>(
     SWRCachePath.getMyStakingRewardAmount(propertyAddress, accountAddress),
     () =>
-      whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
-        getMyStakingRewardAmount(client, propertyAddress, account)
+      whenDefinedAll([nonConnectedWeb3, propertyAddress, accountAddress], ([client, property, account]) =>
+        getMyStakingRewardAmount(client, property, account)
       ),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   return {
@@ -211,18 +221,16 @@ export const useGetMyStakingRewardAmount = (propertyAddress: string) => {
   }
 }
 
-export const useGetMyStakingAmount = (propertyAddress: string) => {
+export const useGetMyStakingAmount = (propertyAddress?: string) => {
   const { nonConnectedWeb3, accountAddress } = useProvider()
   const { currency, toCurrency } = useCurrency()
   const { data, error } = useSWR<UnwrapFunc<typeof getMyStakingAmount>, Error>(
     SWRCachePath.getMyStakingAmount(propertyAddress, accountAddress),
     () =>
-      whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
-        getMyStakingAmount(client, propertyAddress, account)
+      whenDefinedAll([nonConnectedWeb3, propertyAddress, accountAddress], ([client, property, account]) =>
+        getMyStakingAmount(client, property, account)
       ),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   return { myStakingAmount: whenDefined(data, x => toCurrency(toNaturalNumber(x))), currency, error }
@@ -293,7 +301,8 @@ export const useGetEstimateGas4WithdrawStakingAmount = (propertyAddress: string,
     () =>
       whenDefinedAll([web3, accountAddress, amount], ([x, fromAddress, a]) =>
         amount !== '' ? getEstimateGas4WithdrawStakingAmount(x, propertyAddress, a, fromAddress) : undefined
-      )
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
     // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
   )
   const { gasPrice } = useGetGasPrice()
@@ -344,7 +353,8 @@ export const useGetEstimateGas4Stake = (propertyAddress: string, amount?: string
         return stakeAmount.toNumber() >= 0
           ? getEstimateGas4StakeDev(x, propertyAddress, stakeAmount.toFormat({ decimalSeparator: '' }), fromAddress)
           : undefined
-      })
+      }),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
     // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
   )
   const { gasPrice } = useGetGasPrice()
@@ -361,7 +371,7 @@ export const useTotalStakingAmountOnProtocol = () => {
   const { data: stakingAmount, error } = useSWR<UnwrapFunc<typeof getTotalStakingAmountOnProtocol>, Error>(
     SWRCachePath.getTotalStakingAmountOnProtocol(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => getTotalStakingAmountOnProtocol(x)),
-    { onError: err => message.error(err.message) }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return {
     totalStakingAmount: stakingAmount ? Number(stakingAmount) : undefined,
@@ -374,9 +384,7 @@ export const useTotalStakingRatio = () => {
   const { data: totalSupplyValue, error: totalSupplyError } = useSWR<UnwrapFunc<typeof totalSupply>, Error>(
     SWRCachePath.totalSupply(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => totalSupply(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const { data: stakingAmount, error: stakingAmountError } = useSWR<
     UnwrapFunc<typeof getTotalStakingAmountOnProtocol>,
@@ -384,9 +392,7 @@ export const useTotalStakingRatio = () => {
   >(
     SWRCachePath.getTotalStakingAmountOnProtocol(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => getTotalStakingAmountOnProtocol(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return {
     totalStakingRatio: totalSupplyValue && stakingAmount ? Number(stakingAmount) / Number(totalSupplyValue) : undefined,
@@ -399,9 +405,7 @@ export const useStakingShare = (propertyAddress: string) => {
   const { data: inProperty, error: inPropertyError } = useSWR<UnwrapFunc<typeof getTotalStakingAmount>, Error>(
     SWRCachePath.getTotalStakingAmount(propertyAddress, accountAddress),
     () => whenDefined(nonConnectedWeb3, x => getTotalStakingAmount(x, propertyAddress)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const { data: inProtocol, error: inProtocolError } = useSWR<
     UnwrapFunc<typeof getTotalStakingAmountOnProtocol>,
@@ -409,9 +413,7 @@ export const useStakingShare = (propertyAddress: string) => {
   >(
     SWRCachePath.getTotalStakingAmountOnProtocol(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => getTotalStakingAmountOnProtocol(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return {
     stakingShare: inProperty && inProtocol ? Number(inProperty) / Number(inProtocol) : undefined,
@@ -458,7 +460,8 @@ export const useGetEstimateGas4CreateProperty = (name: string, symbol: string, a
     () =>
       whenDefinedAll([web3, accountAddress], ([x, fromAddress]) =>
         getEstimateGas4CreateProperty(x, name, symbol, author, fromAddress)
-      )
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
     // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
   )
   const { gasPrice } = useGetGasPrice()
@@ -535,7 +538,8 @@ export const useGetEstimateGas4CreateAndAuthenticate = (marketAddress: string) =
     () =>
       whenDefinedAll([web3, accountAddress], ([x, fromAddress]) =>
         getEstimateGas4CreateAndAuthenticate(x, 'name', 'symbol', marketAddress, ['a', 'b', 'c'], fromAddress)
-      )
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
     // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
   )
   const { gasPrice } = useGetGasPrice()
@@ -573,9 +577,7 @@ export const useAPY = () => {
   const { data: maxRewards, error: maxRewardsError } = useSWR<UnwrapFunc<typeof calculateMaxRewardsPerBlock>, Error>(
     SWRCachePath.calculateMaxRewardsPerBlock(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => calculateMaxRewardsPerBlock(x).catch(() => '0')),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const { data: totalStaking, error: totalStakingError } = useSWR<
     UnwrapFunc<typeof getTotalStakingAmountOnProtocol>,
@@ -583,9 +585,7 @@ export const useAPY = () => {
   >(
     SWRCachePath.getTotalStakingAmountOnProtocol(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => getTotalStakingAmountOnProtocol(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const { data: holders, error: holdersError } = useSWR<UnwrapFunc<typeof holdersShare>, Error>(
     SWRCachePath.holdersShare(maxRewards, totalStaking),
@@ -593,9 +593,7 @@ export const useAPY = () => {
       maxRewards && totalStaking
         ? whenDefined(nonConnectedWeb3, x => holdersShare(x, maxRewards, totalStaking))
         : undefined,
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   const stakers = maxRewards && holders ? new BigNumber(maxRewards).minus(new BigNumber(holders)) : undefined
@@ -611,9 +609,7 @@ export const useTotalSupply = () => {
   const { data: totalSupplyValue, error } = useSWR<UnwrapFunc<typeof totalSupply>, Error>(
     SWRCachePath.totalSupply(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => totalSupply(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   return { totalSupply: new BigNumber(totalSupplyValue || '0'), error }
@@ -624,9 +620,7 @@ export const useCirculatingSupply = () => {
   const { data: totalSupplyValue, error } = useSWR<UnwrapFunc<typeof totalSupply>, Error>(
     SWRCachePath.totalSupply(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => totalSupply(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   const circulatingSupplyValue = useCallback(async () => {
@@ -658,16 +652,12 @@ export const useAnnualSupplyGrowthRatio = () => {
   const { data: maxRewards, error: maxRewardsError } = useSWR<UnwrapFunc<typeof calculateMaxRewardsPerBlock>, Error>(
     SWRCachePath.calculateMaxRewardsPerBlock(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => calculateMaxRewardsPerBlock(x).catch(() => '0')),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const { data: totalSupplyValue, error: totalSupplyError } = useSWR<UnwrapFunc<typeof totalSupply>, Error>(
     SWRCachePath.totalSupply(accountAddress),
     () => whenDefined(nonConnectedWeb3, x => totalSupply(x)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const year = new BigNumber(2102400)
   const annualSupplyGrowthRatio =
@@ -701,13 +691,12 @@ export const useGetPolicyAddressesList = () => {
 }
 
 export const usePropertyAuthor = (propertyAddress?: string) => {
+  const shouldFetch = propertyAddress && propertyAddress.startsWith('0x')
   const { nonConnectedWeb3, accountAddress } = useProvider()
   const { data, error } = useSWR<undefined | UnwrapFunc<typeof totalSupply>, Error>(
-    SWRCachePath.propertyAuthor(propertyAddress, accountAddress),
+    shouldFetch ? SWRCachePath.propertyAuthor(propertyAddress, accountAddress) : null,
     () => whenDefinedAll([nonConnectedWeb3, propertyAddress], ([client, property]) => propertyAuthor(client, property)),
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   return { author: data, error }
@@ -716,10 +705,13 @@ export const usePropertyAuthor = (propertyAddress?: string) => {
 export const useBalanceOf = () => {
   const { currency, toCurrency } = useCurrency()
   const { nonConnectedWeb3, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(SWRCachePath.balanceOf(accountAddress), () =>
-    whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
-      balanceOf(client, account).then(toBigNumber)
-    )
+  const { data, error } = useSWR<BigNumber | undefined, Error>(
+    SWRCachePath.balanceOf(accountAddress),
+    () =>
+      whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
+        balanceOf(client, account).then(toBigNumber)
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const humanizedDev = whenDefined(data, toNaturalNumber)
   const amount = toCurrency(humanizedDev)
@@ -729,12 +721,15 @@ export const useBalanceOf = () => {
 export const useAllClaimedRewards = () => {
   const { currency, toCurrency } = useCurrency()
   const { nonConnectedWeb3, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(SWRCachePath.allClaimedRewards(accountAddress), () =>
-    whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
-      allClaimedRewards(client, account).then(allEvents => {
-        return allEvents.reduce((a, c) => a.plus(c.returnValues.value), toBigNumber(0))
-      })
-    )
+  const { data, error } = useSWR<BigNumber | undefined, Error>(
+    SWRCachePath.allClaimedRewards(accountAddress),
+    () =>
+      whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
+        allClaimedRewards(client, account).then(allEvents => {
+          return allEvents.reduce((a, c) => a.plus(c.returnValues.value), toBigNumber(0))
+        })
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   const humanizedDev = whenDefined(data, toNaturalNumber)
   const amount = toCurrency(humanizedDev)
@@ -750,9 +745,7 @@ export const usePropertyName = (propertyAddress?: string) => {
       validAddress(propertyAddress)
         ? whenDefinedAll([nonConnectedWeb3, propertyAddress], ([client, property]) => propertyName(client, property))
         : 'Foo',
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   return { name: data, error }
@@ -766,22 +759,21 @@ export const usePropertySymbol = (propertyAddress?: string) => {
       validAddress(propertyAddress)
         ? whenDefinedAll([nonConnectedWeb3, propertyAddress], ([client, property]) => propertySymbol(client, property))
         : 'FOO',
-    {
-      onError: err => message.error(err.message)
-    }
+    { onError: err => message.error(err.message), revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
   return { symbol: data, error }
 }
 
-export const useBalanceOfProperty = (propertyAddress: string) => {
+export const useBalanceOfProperty = (propertyAddress?: string) => {
   const { nonConnectedWeb3, accountAddress } = useProvider()
   const { data, error } = useSWR<BigNumber | undefined, Error>(
     SWRCachePath.balanceOfProperty(propertyAddress, accountAddress),
     () =>
-      whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) =>
-        balanceOfProperty(client, propertyAddress, account).then(toBigNumber)
-      )
+      whenDefinedAll([nonConnectedWeb3, propertyAddress, accountAddress], ([client, property, account]) =>
+        balanceOfProperty(client, property, account).then(toBigNumber)
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return { balance: data, error }
 }
@@ -793,7 +785,190 @@ export const useBalanceOfAccountProperty = (propertyAddress?: string, accountAdd
     () =>
       whenDefinedAll([nonConnectedWeb3, propertyAddress, accountAddress], ([client, property, account]) =>
         balanceOfProperty(client, property, account).then(toBigNumber)
-      )
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
   return { balance: data, error }
+}
+
+export const useDetectSTokens = (propertyAddress?: string, accountAddress?: string) => {
+  const { nonConnectedWeb3 } = useProvider()
+  const { data, error } = useSWR<UnwrapFunc<typeof detectStokens>, Error>(
+    SWRCachePath.detectStokens(propertyAddress, accountAddress),
+    () =>
+      whenDefinedAll([nonConnectedWeb3, propertyAddress, accountAddress], ([client, property, account]) =>
+        detectStokens(client, property, account)
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+
+  return { sTokens: data, error }
+}
+
+export const usePositionsOfOwner = (accountAddress?: string) => {
+  const { nonConnectedWeb3 } = useProvider()
+  const { data, error } = useSWR<UnwrapFunc<typeof positionsOfOwner>, Error>(
+    SWRCachePath.positionsOfOwner(accountAddress),
+    () => whenDefinedAll([nonConnectedWeb3, accountAddress], ([client, account]) => positionsOfOwner(client, account)),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+
+  return { positions: data, error }
+}
+
+export const useGetSTokenPositions = (sTokenId?: number) => {
+  const { nonConnectedWeb3 } = useProvider()
+  const { currency, toCurrency } = useCurrency()
+  const { data, error } = useSWR<UnwrapFunc<typeof getStokenPositions>, Error>(
+    SWRCachePath.getStokenPositions(`${sTokenId}`),
+    () => whenDefinedAll([nonConnectedWeb3, sTokenId], ([client, sTokenId]) => getStokenPositions(client, sTokenId)),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+  const amount = whenDefined(data, pos => toCurrency(toNaturalNumber(pos.amount)))
+  return { positions: data, error, currency, amount }
+}
+
+export const useGetStokenRewards = (sTokenId?: number) => {
+  const { nonConnectedWeb3 } = useProvider()
+  const { currency, toCurrency } = useCurrency()
+  const { data, error } = useSWR<UnwrapFunc<typeof getStokenRewards>, Error>(
+    SWRCachePath.getStokenRewards(`${sTokenId}`),
+    () => whenDefinedAll([nonConnectedWeb3, sTokenId], ([client, sTokenId]) => getStokenRewards(client, sTokenId)),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+  const withdrawableReward = whenDefined(data, pos => toCurrency(toNaturalNumber(pos.withdrawableReward)))
+  return { rewards: data, error, currency, withdrawableReward }
+}
+
+export const useApprove = () => {
+  const { web3 } = useProvider()
+  const [isLoading, setIsLoading] = useState(false)
+  const [ok, setOK] = useState(false)
+  const [error, setError] = useState<Error>()
+  const callback = useCallback(
+    async (address: string, amount: string) => {
+      setIsLoading(true)
+      setError(undefined)
+      return whenDefined(web3, client =>
+        approve(client, address, amount)
+          .then(result => setOK(result || false))
+          .catch(setError)
+          .finally(() => {
+            setIsLoading(false)
+          })
+      )
+    },
+    [web3]
+  )
+  return { approve: callback, ok, isLoading, error }
+}
+
+export const useDepositToProperty = () => {
+  const { web3 } = useProvider()
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error>()
+  const callback = useCallback(
+    async (propertyAddress: string, amount: string) => {
+      setIsLoading(true)
+      setError(undefined)
+      return whenDefined(web3, client =>
+        depositToProperty(client, propertyAddress, amount)
+          .catch(setError)
+          .finally(() => {
+            setIsLoading(false)
+          })
+      )
+    },
+    [web3]
+  )
+  return { depositToProperty: callback, isLoading, error }
+}
+
+export const useDepositToPosition = () => {
+  const { web3 } = useProvider()
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error>()
+  const callback = useCallback(
+    async (sTokenId: string, amount: string) => {
+      setIsLoading(true)
+      setError(undefined)
+      return whenDefined(web3, client =>
+        depositToPosition(client, sTokenId, amount)
+          .catch(setError)
+          .finally(() => {
+            setIsLoading(false)
+          })
+      )
+    },
+    [web3]
+  )
+  return { depositToPosition: callback, isLoading, error }
+}
+
+export const useWithdrawByPosition = () => {
+  const { web3 } = useProvider()
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error>()
+  const callback = useCallback(
+    async (sTokenId: string, amount: string) => {
+      setIsLoading(true)
+      setError(undefined)
+      return whenDefined(web3, client =>
+        withdrawByPosition(client, sTokenId, amount)
+          .catch(setError)
+          .finally(() => {
+            setIsLoading(false)
+          })
+      )
+    },
+    [web3]
+  )
+  return { withdrawByPosition: callback, isLoading, error }
+}
+
+export const useMigrateToSTokens = () => {
+  const { web3 } = useProvider()
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error>()
+  const callback = useCallback(
+    async (propertyAddress: string) => {
+      setIsLoading(true)
+      setError(undefined)
+      // return new Promise(resolve =>
+      //   setTimeout(() => {
+      //     store.set(1, true)
+      //     resolve()
+      //   }, 3000)
+      // )
+      return whenDefined(web3, client =>
+        migrateToSTokens(client, propertyAddress)
+          .catch(setError)
+          .finally(() => {
+            setIsLoading(false)
+          })
+      )
+    },
+    [web3]
+  )
+  return { migrateToSTokens: callback, isLoading, error }
+}
+
+export const useGetTokenURI = (sTokenId?: number) => {
+  const { nonConnectedWeb3 } = useProvider()
+  const { data, error } = useSWR<UnwrapFunc<typeof getTokenURI>, Error>(
+    SWRCachePath.getTokenURI(`${sTokenId}`),
+    () => whenDefinedAll([nonConnectedWeb3, sTokenId], ([client, sTokenId]) => getTokenURI(client, sTokenId)),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+  return { tokenURI: data, error }
+}
+
+export const useGetStokenSymbol = (sTokenId?: number) => {
+  const { nonConnectedWeb3 } = useProvider()
+  const { data, error } = useSWR<UnwrapFunc<typeof getStokenSymbol>, Error>(
+    SWRCachePath.getStokenSymbol(`${sTokenId}`),
+    () => whenDefinedAll([nonConnectedWeb3, sTokenId], ([client, sTokenId]) => getStokenSymbol(client, sTokenId)),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+  return { symbol: data, error }
 }
