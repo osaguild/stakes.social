@@ -1,3 +1,4 @@
+// @L2 optimized
 import React, { useEffect, useState } from 'react'
 import { useQuery } from '@apollo/client'
 import getTopStakersOfPropertyQuery from './query/getTopStakersOfProperty'
@@ -8,6 +9,8 @@ import { useGetAccount } from 'src/fixtures/dev-for-apps/hooks'
 import { useENS } from 'src/fixtures/ens/hooks'
 import { Spin } from 'antd'
 import Link from 'next/link'
+import { useIsL1 } from 'src/fixtures/wallet/hooks'
+import Text from 'antd/lib/typography/Text'
 
 interface TopStakersProps {
   propertyAddress?: string
@@ -73,7 +76,7 @@ const Staker = ({ accountAddress, value }: { accountAddress: string; value: numb
   const { getENS } = useENS()
   useEffect(() => {
     const fetchENS = async () => {
-      await getENS(accountAddress || '').then((o?: string) => setENS(o || ''))
+      await getENS(accountAddress || '').then((o?: string | null) => setENS(o || ''))
     }
     fetchENS()
   }, [accountAddress, getENS])
@@ -99,12 +102,13 @@ const Staker = ({ accountAddress, value }: { accountAddress: string; value: numb
 }
 
 const TopStakers = ({ authorAddress, propertyAddress }: TopStakersProps) => {
+  const { isL1 } = useIsL1()
   const { data: topPropertyStakersData, loading: isPropertyStakingLoading } = useQuery(getTopStakersOfPropertyQuery, {
     variables: {
       limit: 5,
       property_address: propertyAddress
     },
-    skip: !!authorAddress || !propertyAddress
+    skip: !isL1 || !!authorAddress || !propertyAddress
   })
 
   const [fetchTopCreatorStakers, { data: topCreatorStakersData, loading: isCreatorStakingLoading }] =
@@ -124,7 +128,7 @@ const TopStakers = ({ authorAddress, propertyAddress }: TopStakersProps) => {
   const stakerItems: Array<{ account_address: string; value: number }> =
     topPropertyStakersData?.property_lockup || topCreatorStakersData?.account_lockup
 
-  return (
+  return isL1 ? (
     <Flex>
       {(isPropertyStakingLoading || isCreatorStakingLoading) && (
         <PlaceHolderList>
@@ -144,6 +148,8 @@ const TopStakers = ({ authorAddress, propertyAddress }: TopStakersProps) => {
         ))}
       </TopStakerRanking>
     </Flex>
+  ) : (
+    <Text type="secondary">(Not provide this feature yet on L2)</Text>
   )
 }
 

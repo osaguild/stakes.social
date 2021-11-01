@@ -5,9 +5,10 @@ import {
   useGetTotalStakingAmount,
   useGetTotalRewardsAmount,
   useGetMyStakingRewardAmount,
-  usePropertyAuthor
+  usePropertyAuthor,
+  usePropertyName
 } from 'src/fixtures/dev-kit/hooks'
-import { useProvider } from 'src/fixtures/wallet/hooks'
+import { useIsL1, useProvider } from 'src/fixtures/wallet/hooks'
 import styled from 'styled-components'
 import { truncate } from 'src/fixtures/utility/string'
 import { useGetPropertytInformation } from 'src/fixtures/devprtcl/hooks'
@@ -20,13 +21,9 @@ import { ResponsiveModal } from 'src/components/atoms/ResponsiveModal'
 import { CoverImageOrGradient } from 'src/components/atoms/CoverImageOrGradient'
 import { Grid } from 'src/components/atoms/Grid'
 
-interface Asset {
-  authentication_id: string
-}
-
 interface Props {
   propertyAddress: string
-  assets: Asset[]
+  assets: (string | undefined)[]
 }
 
 const Card = styled(Grid)`
@@ -177,17 +174,19 @@ const PlaceholderCoverImageOrGradient = styled.div`
 
 export const PropertyCard = ({ propertyAddress, assets }: Props) => {
   const { accountAddress } = useProvider()
+  const { isL1 } = useIsL1()
   const [modalStates, setModalStates] = useState<ModalStates>({ visible: false })
   const { totalStakingAmount, currency: totalStakingAmountCurrency } = useGetTotalStakingAmount(propertyAddress)
   const { totalRewardsAmount, currency: totalRewardsAmountCurrency } = useGetTotalRewardsAmount(propertyAddress)
   const { myStakingRewardAmount, currency: myStakingRewardAmountCurrency } =
     useGetMyStakingRewardAmount(propertyAddress)
   const { myStakingAmount, currency: myStakingAmountCurrency } = useGetMyStakingAmount(propertyAddress)
-  const { data: authorData } = useGetPropertytInformation(propertyAddress)
+  const { data: authorData } = useGetPropertytInformation(isL1 ? propertyAddress : undefined)
   const { author: authorAddress } = usePropertyAuthor(propertyAddress)
   const { data: dataAuthor } = useGetAccount(authorAddress)
   const { data: dataProperty } = useGetProperty(propertyAddress)
-  const includeAssets = useMemo(() => assets && truncate(assets.map(e => e.authentication_id).join(', '), 24), [assets])
+  const { name: propertyName } = usePropertyName(propertyAddress)
+  const includeAssets = useMemo(() => assets && truncate(assets.join(', '), 24), [assets])
 
   const zeroBigNumber = new BigNumber(0)
 
@@ -208,18 +207,22 @@ export const PropertyCard = ({ propertyAddress, assets }: Props) => {
       )}
       <Link href={'/[propertyAddress]'} as={`/${propertyAddress}`}>
         <CardContents>
-          <Title>{includeAssets || 'Property'}</Title>
-          <PropertyTreasuryIcon name={includeAssets} propertyAddress={propertyAddress} />
+          <Title>{includeAssets || propertyName || 'Property'}</Title>
+          <PropertyTreasuryIcon name={includeAssets || propertyName || 'Property'} propertyAddress={propertyAddress} />
           <PropertyDescription>
             {dataProperty?.description ||
               'Stake DEV tokens to provide funding for OSS projects so that they can maintain development.'}
           </PropertyDescription>
           <FlexRow>
-            <Avatar accountAddress={authorData?.author.address} size={'60'} />
+            <Avatar accountAddress={authorAddress} size={'60'} />
             <FlewColumn>
               <span style={{ fontWeight: 'lighter' }}>Creator</span>
-              <span style={{ color: '#1AC9FC' }}>{dataAuthor?.name || authorData?.name}</span>
-              <span>{authorData?.author?.karma ? formatter.format(authorData?.author?.karma) : 0} Karma</span>
+              <span style={{ color: '#1AC9FC' }}>{dataAuthor?.name || authorAddress}</span>
+              {authorData ? (
+                <span>{authorData.author?.karma ? formatter.format(authorData.author?.karma) : 0} Karma</span>
+              ) : (
+                ''
+              )}
             </FlewColumn>
           </FlexRow>
           <RowContainer>

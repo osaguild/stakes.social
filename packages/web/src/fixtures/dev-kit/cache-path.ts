@@ -5,7 +5,7 @@ export const SWRCachePath = {
     `propertyAddresses/${user}${propertyAddress}/getTotalStakingAmount`,
   getMyHolderAmount: (propertyAddress?: string, user?: string) =>
     `propertyAddresses/${user}${propertyAddress}/getMyHolderAmount`,
-  getTreasuryAmount: (propertyAddress: string) => `propertyAddresses/${propertyAddress}/getTreasuryAmount`,
+  getTreasuryAmount: (propertyAddress?: string) => `propertyAddresses/${propertyAddress}/getTreasuryAmount`,
   getMyStakingRewardAmount: (propertyAddress?: string, user?: string) =>
     `propertyAddresses/${user}${propertyAddress}/getMyStakingRewardAmount`,
   getMyStakingAmount: (propertyAddress?: string, user?: string) =>
@@ -46,5 +46,10 @@ export const SWRCachePath = {
     `propertyAddresses/${user}${propertyAddress}/withdrawByPosition`,
   migrateToSTokens: (sTokenId?: string) => `sTokenId/${sTokenId}/migrateToSTokens`,
   getTokenURI: (sTokenId?: string) => `sTokenId/${sTokenId}/getTokenURI`,
-  getStokenSymbol: (sTokenId?: string) => `sTokenId/${sTokenId}/getStokenSymbol`
+  getStokenSymbol: (sTokenId?: string) => `sTokenId/${sTokenId}/getStokenSymbol`,
+  enabledMarkets: (network?: string) => `enabledMarkets/${network}`,
+  getAuthenticatedProperties: (network?: string, marketAddress?: string) =>
+    `getAuthenticatedProperties/${network}/${marketAddress}`,
+  useGetAssetsByProperties: (network?: string, propertyAddress?: string) =>
+    `useGetAssetsByProperties/${network}/${propertyAddress}`
 } as const

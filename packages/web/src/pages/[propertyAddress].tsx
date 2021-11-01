@@ -1,11 +1,11 @@
+// @L2 optimized
 import React, { useCallback, useMemo, useEffect, useState } from 'react'
-import Error from 'next/error'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import styled from 'styled-components'
 import ReactMarkdown from 'react-markdown'
 import { PlusOutlined, LinkOutlined } from '@ant-design/icons'
-import { Button, Form, Input, Spin, Skeleton, Upload } from 'antd'
+import { Button, Form, Input, Upload } from 'antd'
 import { UploadChangeParam, UploadFile } from 'antd/lib/upload/interface'
 import { FormInstance } from 'antd/lib/form'
 import { PossessionOutline } from 'src/components/organisms/PossessionOutline'
@@ -16,8 +16,8 @@ import { ButtonWithGradient } from 'src/components/atoms/ButtonWithGradient'
 import { Container } from 'src/components/atoms/Container'
 import { Header } from 'src/components/organisms/Header'
 import TopStakers from 'src/components/organisms/TopStakers'
-import { useAPY, useGetMyStakingAmount, usePropertyAuthor } from 'src/fixtures/dev-kit/hooks'
-import { useGetPropertyAuthenticationQuery, useGetPropertyAggregateLazyQuery } from '@dev/graphql'
+import { useAPY, useGetAssetsByProperties, useGetMyStakingAmount, usePropertyAuthor } from 'src/fixtures/dev-kit/hooks'
+import { useGetPropertyAuthenticationQuery } from '@dev/graphql'
 import { useGetPropertytInformation } from 'src/fixtures/devprtcl/hooks'
 import {
   useGetAccount,
@@ -28,15 +28,13 @@ import {
   useDeleteFile
 } from 'src/fixtures/dev-for-apps/hooks'
 import { Image, Property as DevForAppsProperty } from 'src/fixtures/dev-for-apps/utility'
-import { WithGradient } from 'src/components/atoms/WithGradient'
 import { Stake } from 'src/components/organisms/Stake'
 import { Withdraw } from 'src/components/organisms/Withdraw'
-import { useProvider } from 'src/fixtures/wallet/hooks'
+import { useIsL1, useProvider } from 'src/fixtures/wallet/hooks'
 import { Avatar } from 'src/components/molecules/Avatar'
 import { CoverImageOrGradient } from 'src/components/atoms/CoverImageOrGradient'
 import { H3 } from 'src/components/atoms/Typography'
 import { Twitter, Github } from 'src/components/atoms/SocialButtons'
-import { getPath } from 'src/fixtures/utility/route'
 import { whenDefined } from 'src/fixtures/utility'
 
 type Props = {}
@@ -134,13 +132,6 @@ const Flex = styled.div`
   }
 `
 
-const CreatorContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  margin-left: 20px;
-`
-
 const RoundedCoverImageOrGradient = styled(CoverImageOrGradient)`
   border-radius: 5px;
 `
@@ -160,66 +151,27 @@ const EditPropertyButton = styled(ButtonWithGradient)`
   margin: 0 1rem 0.5rem;
 `
 
-const formatter = new Intl.NumberFormat('en-US')
-
 const Author = ({ propertyAddress }: { propertyAddress: string }) => {
-  const { data, error } = useGetPropertytInformation(propertyAddress)
   const { author: authorAddress } = usePropertyAuthor(propertyAddress)
   const { data: dataAuthor } = useGetAccount(authorAddress)
 
-  const [fetchAggregate, { data: aggregateData }] = useGetPropertyAggregateLazyQuery()
-
-  useEffect(() => {
-    if (authorAddress) {
-      fetchAggregate({
-        variables: {
-          authorAddress
-        }
-      })
-    }
-  }, [authorAddress, fetchAggregate])
-
-  return (
+  return authorAddress ? (
     <AuthorContainer>
-      {data && (
-        <>
-          <h2>
-            Created by <Link href={`/author/${authorAddress}`}>{dataAuthor?.name || data?.name}</Link>
-          </h2>
-          <Flex>
-            <Link passHref href="/author/[accountAddress]" as={`/author/${authorAddress}`}>
-              <a>
-                <div style={{ width: '150px' }}>
-                  <Avatar size={'150'} accountAddress={authorAddress} />
-                </div>
-              </a>
-            </Link>
-
-            <CreatorContent>
-              <ReactMarkdown>{dataAuthor ? dataAuthor.biography : ''}</ReactMarkdown>
-              <p>
-                <WithGradient>{aggregateData?.property_meta_aggregate.aggregate?.count || 0}</WithGradient> Pool(s) |{' '}
-                <WithGradient>{data?.author?.karma ? formatter.format(data?.author.karma) : 0} </WithGradient> Karma
-              </p>
-            </CreatorContent>
-          </Flex>
-        </>
-      )}
-
-      {!data && !error && (
-        <>
-          <div>Author</div>
-          <Spin size="large" style={{ display: 'block', width: 'auto', padding: '100px' }} />
-        </>
-      )}
-
-      {error && (
-        <>
-          <div>Author</div>
-          <div>Cannot load: {error.message}</div>
-        </>
-      )}
+      <h2>
+        Created by <Link href={`/author/${authorAddress}`}>{dataAuthor?.name || authorAddress}</Link>
+      </h2>
+      <Flex>
+        <Link passHref href="/author/[accountAddress]" as={`/author/${authorAddress}`}>
+          <a>
+            <div style={{ width: '150px' }}>
+              <Avatar size={'150'} accountAddress={authorAddress} />
+            </div>
+          </a>
+        </Link>
+      </Flex>
     </AuthorContainer>
+  ) : (
+    <></>
   )
 }
 
@@ -400,43 +352,39 @@ const Convert = ({ propertyAddress }: { propertyAddress: string }) => {
 }
 
 const PropertyAddressDetail = (_: Props) => {
-  const [urlPathArg] = getPath(useRouter().asPath)
-  const propertyAddress = urlPathArg.split('?')[0]
+  const { isL1 } = useIsL1()
+  const { propertyAddress } = useRouter().query as { propertyAddress: string }
   const { apy, creators } = useAPY()
-  const { data } = useGetPropertyAuthenticationQuery({ variables: { propertyAddress } })
-  const isExistProperty = useMemo(() => data && data?.property_authentication.length > 0, [data])
-  const { data: dataProperty } = useGetProperty(isExistProperty ? propertyAddress : undefined)
-  const { data: propertyInformation } = useGetPropertytInformation(isExistProperty ? propertyAddress : undefined)
+  const { data } = useGetPropertyAuthenticationQuery({ variables: { propertyAddress }, skip: !isL1 })
+  const { data: dataProperty } = useGetProperty(propertyAddress)
+  const { data: propertyInformation } = useGetPropertytInformation(isL1 ? propertyAddress : undefined)
   /* eslint-disable react-hooks/exhaustive-deps */
   // FYI: https://github.com/facebook/react/pull/19062
-  const includedAssetList = useMemo(() => data?.property_authentication.map(e => e.authentication_id), [data])
+  const { data: includedAssetListL2 } = useGetAssetsByProperties(propertyAddress)
   const { accountAddress: loggedInWallet } = useProvider()
   const { author: authorAddress } = usePropertyAuthor(propertyAddress)
   const { myStakingAmount } = useGetMyStakingAmount(propertyAddress)
+  const includedAssetList = useMemo(
+    () => (data ? data.property_authentication.map(e => e.authentication_id) : includedAssetListL2?.map(e => e.id)),
+    [data, includedAssetListL2]
+  )
 
-  return data && !isExistProperty ? (
-    // property is not found
-    <Error statusCode={404} />
-  ) : (
+  return (
     <>
       <Header></Header>
       <Wrap>
         <Container>
-          {data ? (
-            <PropertyHeader apy={apy} creators={creators} propertyAddress={propertyAddress} />
-          ) : (
-            <Skeleton active paragraph={{ rows: 1 }} />
-          )}
+          <PropertyHeader apy={apy} creators={creators} propertyAddress={propertyAddress} />
         </Container>
         <Main>
           <RoundedCoverImageOrGradient src={dataProperty?.cover_image?.url} ratio={52.5} />
-          {isExistProperty && <Possession propertyAddress={propertyAddress} />}
+          {<Possession propertyAddress={propertyAddress} />}
           {myStakingAmount?.isGreaterThan(0) && <Convert propertyAddress={propertyAddress} />}
           <Transact>
-            {isExistProperty && (loggedInWallet ? loggedInWallet !== authorAddress : true) && (
+            {(loggedInWallet ? loggedInWallet !== authorAddress : true) && (
               <Stake title="Stake" propertyAddress={propertyAddress} />
             )}
-            {isExistProperty && <Withdraw title="Withdraw" propertyAddress={propertyAddress} isDisplayFee={true} />}
+            {<Withdraw title="Withdraw" propertyAddress={propertyAddress} isDisplayFee={true} />}
           </Transact>
           <PropertyAbout
             isAuthor={loggedInWallet === authorAddress}
@@ -460,10 +408,10 @@ const PropertyAddressDetail = (_: Props) => {
               )}
             </AssetList>
           </AssetsSection>
-          {isExistProperty && <Author propertyAddress={propertyAddress} />}
+          {<Author propertyAddress={propertyAddress} />}
           <div>
             <h2>Top stakers</h2>
-            {isExistProperty && <TopStakerList propertyAddress={propertyAddress} />}
+            {<TopStakerList propertyAddress={propertyAddress} />}
           </div>
         </Main>
       </Wrap>
