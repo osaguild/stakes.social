@@ -3,19 +3,14 @@ import {
   getRewardsAmount,
   getTotalStakingAmount,
   withdrawHolderAmount,
-  getEstimateGas4WithdrawHolderAmount,
   getMyHolderAmount,
   getTreasuryAmount,
   stakeDev,
-  getEstimateGas4StakeDev,
   withdrawStakingAmount,
-  getEstimateGas4WithdrawStakingAmount,
   getMyStakingRewardAmount,
   createProperty,
-  getEstimateGas4CreateProperty,
   marketScheme,
   authenticate,
-  getEstimateGas4CreateAndAuthenticate,
   getTotalStakingAmountOnProtocol,
   calculateMaxRewardsPerBlock,
   totalSupply,
@@ -29,8 +24,11 @@ import {
   propertySymbol,
   balanceOfProperty,
   detectStokens,
+  detectStokensByPropertyAddress,
+  getStokenOwnerOf,
   getStokenPositions,
   getStokenRewards,
+  allowance,
   approve,
   depositToProperty,
   depositToPosition,
@@ -55,12 +53,11 @@ import {
   whenDefined,
   whenDefinedAll
 } from 'src/fixtures/utility'
-import { useGetGasPrice } from 'src/fixtures/gas/hooks'
 import useSWR from 'swr'
 import { message } from 'antd'
-import { useMemo, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import BigNumber from 'bignumber.js'
-import { useDetectChain, useProvider } from 'src/fixtures/wallet/hooks'
+import { useDetectChain, useIsL1, useProvider } from 'src/fixtures/wallet/hooks'
 import { useCurrency } from 'src/fixtures/currency/functions/useCurrency'
 import { isAddress } from 'web3-utils'
 import { UndefinedOr } from '@devprotocol/util-ts'
@@ -135,23 +132,6 @@ export const useWithdrawHolderReward = () => {
   )
 
   return { withdrawHolder, isLoading, error }
-}
-
-export const useGetEstimateGas4WithdrawHolderAmount = (propertyAddress: string) => {
-  const { ethersProvider, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(
-    SWRCachePath.getEstimateGas4WithdrawHolderAmount(propertyAddress, accountAddress),
-    () => whenDefinedAll([ethersProvider], ([x]) => getEstimateGas4WithdrawHolderAmount(x, propertyAddress)),
-    { revalidateOnFocus: false, focusThrottleInterval: 0 }
-    // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
-  )
-  const { gasPrice } = useGetGasPrice()
-  const estimateGas = useMemo(
-    () => whenDefinedAll([data, gasPrice], ([x, g]) => toNaturalNumber(x).multipliedBy(g)),
-    [gasPrice, data]
-  )
-
-  return { estimateGas, error }
 }
 
 export const useGetMyHolderAmount = (propertyAddress?: string) => {
@@ -349,26 +329,6 @@ export const useWithdrawStaking = () => {
   return { withdrawStaking, isLoading, error }
 }
 
-export const useGetEstimateGas4WithdrawStakingAmount = (propertyAddress: string, amount: string) => {
-  const { ethersProvider, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(
-    SWRCachePath.getEstimateGas4WithdrawStakingAmount(propertyAddress, amount || '0', accountAddress),
-    () =>
-      whenDefinedAll([ethersProvider, accountAddress, amount], ([x, fromAddress, a]) =>
-        amount !== '' ? getEstimateGas4WithdrawStakingAmount(x, propertyAddress, a, fromAddress) : undefined
-      ),
-    { revalidateOnFocus: false, focusThrottleInterval: 0 }
-    // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
-  )
-  const { gasPrice } = useGetGasPrice()
-  const estimateGas = useMemo(
-    () => whenDefinedAll([data, gasPrice], ([x, g]) => toNaturalNumber(x).multipliedBy(g)),
-    [gasPrice, data]
-  )
-
-  return { estimateGas, error }
-}
-
 export const useStake = () => {
   const { ethersProvider } = useProvider()
   const key = 'useStake'
@@ -396,29 +356,6 @@ export const useStake = () => {
   )
 
   return { stake, isLoading, error }
-}
-
-export const useGetEstimateGas4Stake = (propertyAddress: string, amount?: string) => {
-  const { ethersProvider, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(
-    SWRCachePath.getEstimateGas4Stake(propertyAddress, accountAddress, amount),
-    () =>
-      whenDefinedAll([ethersProvider, amount], ([x, a]) => {
-        const stakeAmount = toAmountNumber(a)
-        return stakeAmount.toNumber() >= 0
-          ? getEstimateGas4StakeDev(x, propertyAddress, stakeAmount.toFormat({ decimalSeparator: '' }))
-          : undefined
-      }),
-    { revalidateOnFocus: false, focusThrottleInterval: 0 }
-    // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
-  )
-  const { gasPrice } = useGetGasPrice()
-  const estimateGas = useMemo(
-    () => whenDefinedAll([data, gasPrice], ([x, g]) => toNaturalNumber(x).multipliedBy(g)),
-    [gasPrice, data]
-  )
-
-  return { estimateGas, error }
 }
 
 export const useTotalStakingAmountOnProtocol = () => {
@@ -543,22 +480,6 @@ export const useCreateProperty = () => {
   return { createProperty: callback, isLoading, error }
 }
 
-export const useGetEstimateGas4CreateProperty = (name: string, symbol: string, author: string) => {
-  const { ethersProvider, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(
-    SWRCachePath.getEstimateGas4CreateProperty(name, symbol, author, accountAddress),
-    () => whenDefinedAll([ethersProvider], ([x]) => getEstimateGas4CreateProperty(x, name, symbol, author)),
-    { revalidateOnFocus: false, focusThrottleInterval: 0 }
-    // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
-  )
-  const { gasPrice } = useGetGasPrice()
-  const estimateGas = useMemo(
-    () => whenDefinedAll([data, gasPrice], ([x, g]) => toNaturalNumber(x).multipliedBy(g)),
-    [gasPrice, data]
-  )
-  return { estimateGas, error }
-}
-
 export const useMarketScheme = () => {
   const { ethersProvider } = useProvider()
   const key = 'useMarketScheme'
@@ -618,26 +539,6 @@ export const useAuthenticate = () => {
   return { authenticate: callback, isLoading, error }
 }
 
-export const useGetEstimateGas4CreateAndAuthenticate = (marketAddress: string) => {
-  const { ethersProvider, accountAddress } = useProvider()
-  const { data, error } = useSWR<BigNumber | undefined, Error>(
-    SWRCachePath.getEstimateGas4CreateAndAuthenticate('name', 'symbol', marketAddress, accountAddress),
-    () =>
-      whenDefinedAll([ethersProvider], ([x]) =>
-        getEstimateGas4CreateAndAuthenticate(x, 'name', 'symbol', marketAddress, ['a', 'b', 'c'])
-      ),
-    { revalidateOnFocus: false, focusThrottleInterval: 0 }
-    // NOTE: If an error occurs, nothing is done. Because it only displays the estimated gas price.
-  )
-  const { gasPrice } = useGetGasPrice()
-  const estimateGas = useMemo(
-    () => whenDefinedAll([data, gasPrice], ([x, g]) => toNaturalNumber(x).multipliedBy(g)),
-    [gasPrice, data]
-  )
-
-  return { estimateGas, error }
-}
-
 export const useCreateAndAuthenticate = () => {
   const { ethersProvider } = useProvider()
   const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -661,8 +562,10 @@ export const useCreateAndAuthenticate = () => {
 
 export const useAPY = () => {
   const { nonConnectedEthersProvider, accountAddress } = useProvider()
+  const { name: chain } = useDetectChain(nonConnectedEthersProvider)
+  const { isL1 } = useIsL1()
   const { data: maxRewards, error: maxRewardsError } = useSWR<UnwrapFunc<typeof calculateMaxRewardsPerBlock>, Error>(
-    SWRCachePath.calculateMaxRewardsPerBlock(accountAddress),
+    SWRCachePath.calculateMaxRewardsPerBlock(chain, accountAddress),
     () => whenDefined(nonConnectedEthersProvider, x => calculateMaxRewardsPerBlock(x).catch(() => '0')),
     {
       onError: err => {
@@ -677,7 +580,7 @@ export const useAPY = () => {
     UnwrapFunc<typeof getTotalStakingAmountOnProtocol>,
     Error
   >(
-    SWRCachePath.getTotalStakingAmountOnProtocol(accountAddress),
+    SWRCachePath.getTotalStakingAmountOnProtocol(chain, accountAddress),
     () => whenDefined(nonConnectedEthersProvider, x => getTotalStakingAmountOnProtocol(x)),
     {
       onError: err => {
@@ -689,7 +592,7 @@ export const useAPY = () => {
     }
   )
   const { data: holders, error: holdersError } = useSWR<UnwrapFunc<typeof holdersShare>, Error>(
-    SWRCachePath.holdersShare(maxRewards, totalStaking),
+    SWRCachePath.holdersShare(chain, maxRewards, totalStaking),
     () =>
       maxRewards && totalStaking
         ? whenDefined(nonConnectedEthersProvider, x => holdersShare(x, maxRewards, totalStaking))
@@ -705,7 +608,7 @@ export const useAPY = () => {
   )
 
   const stakers = maxRewards && holders ? new BigNumber(maxRewards).minus(new BigNumber(holders)) : undefined
-  const year = new BigNumber(2102400)
+  const year = new BigNumber(isL1 ? 2102400 : 31536000)
   const apy = stakers && totalStaking ? stakers.times(year).div(totalStaking).times(100) : undefined
   const creators = holders && totalStaking ? new BigNumber(holders).times(year).div(totalStaking).times(100) : undefined
 
@@ -772,9 +675,11 @@ export const useCirculatingSupply = () => {
 }
 
 export const useAnnualSupplyGrowthRatio = () => {
-  const { nonConnectedEthersProvider, accountAddress } = useProvider()
+  const { nonConnectedEthersProvider, nonConnectedEthersL1Provider, accountAddress } = useProvider()
+  const { name: chain } = useDetectChain(nonConnectedEthersProvider)
+  const { isL1 } = useIsL1()
   const { data: maxRewards, error: maxRewardsError } = useSWR<UnwrapFunc<typeof calculateMaxRewardsPerBlock>, Error>(
-    SWRCachePath.calculateMaxRewardsPerBlock(accountAddress),
+    SWRCachePath.calculateMaxRewardsPerBlock(chain, accountAddress),
     () => whenDefined(nonConnectedEthersProvider, x => calculateMaxRewardsPerBlock(x).catch(() => '0')),
     {
       onError: err => {
@@ -786,8 +691,8 @@ export const useAnnualSupplyGrowthRatio = () => {
     }
   )
   const { data: totalSupplyValue, error: totalSupplyError } = useSWR<UnwrapFunc<typeof totalSupply>, Error>(
-    SWRCachePath.totalSupply(accountAddress),
-    () => whenDefined(nonConnectedEthersProvider, x => totalSupply(x)),
+    SWRCachePath.totalSupply(chain, accountAddress),
+    () => whenDefined(nonConnectedEthersL1Provider, x => totalSupply(x)),
     {
       onError: err => {
         console.log(err)
@@ -797,7 +702,7 @@ export const useAnnualSupplyGrowthRatio = () => {
       focusThrottleInterval: 0
     }
   )
-  const year = new BigNumber(2102400)
+  const year = new BigNumber(isL1 ? 2102400 : 31536000)
   const annualSupplyGrowthRatio =
     maxRewards && totalSupplyValue ? new BigNumber(maxRewards).times(year).div(totalSupplyValue).times(100) : undefined
 
@@ -968,7 +873,23 @@ export const useDetectSTokens = (propertyAddress?: string, accountAddress?: stri
     { revalidateOnFocus: false, focusThrottleInterval: 0 }
   )
 
-  return { sTokens: data, error }
+  const { data: detectStokensByPropertyAddressData, error: byPropertyAddressError } = useSWR<
+    UnwrapFunc<typeof detectStokensByPropertyAddress>,
+    Error
+  >(
+    SWRCachePath.detectStokens(propertyAddress, 'ALL'),
+    () =>
+      whenDefinedAll([nonConnectedEthersProvider, propertyAddress], ([client, property]) =>
+        detectStokensByPropertyAddress(client, property)
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+
+  return {
+    sTokens: data,
+    sTokensByPropertyAddress: detectStokensByPropertyAddressData,
+    error: error || byPropertyAddressError
+  }
 }
 
 export const usePositionsOfOwner = (accountAddress?: string) => {
@@ -983,6 +904,19 @@ export const usePositionsOfOwner = (accountAddress?: string) => {
   )
 
   return { positions: data, error }
+}
+
+export const useGetSTokenOwnerOf = (sTokenId?: number) => {
+  const { nonConnectedEthersProvider } = useProvider()
+  const { data, error } = useSWR<UnwrapFunc<typeof getStokenOwnerOf>, Error>(
+    SWRCachePath.getStokenOwnerOf(`${sTokenId}`),
+    () =>
+      whenDefinedAll([nonConnectedEthersProvider, sTokenId], ([client, sTokenId]) =>
+        getStokenOwnerOf(client, sTokenId)
+      ),
+    { revalidateOnFocus: false, focusThrottleInterval: 0 }
+  )
+  return { owner: data, error }
 }
 
 export const useGetSTokenPositions = (sTokenId?: number) => {
@@ -1013,6 +947,28 @@ export const useGetStokenRewards = (sTokenId?: number) => {
   )
   const withdrawableReward = whenDefined(data, pos => toCurrency(toNaturalNumber(pos.withdrawableReward)))
   return { rewards: data, error, currency, withdrawableReward }
+}
+
+export const useAllowance = () => {
+  const { ethersProvider } = useProvider()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<Error>()
+  const callback = useCallback(
+    async (contractAddress: string, accountAddress?: string) => {
+      setIsLoading(true)
+      setError(undefined)
+      return whenDefined(ethersProvider, client =>
+        allowance(client, contractAddress, accountAddress)
+          .then(d => new BigNumber(d || '0'))
+          .catch(setError)
+          .finally(() => {
+            setIsLoading(false)
+          })
+      )
+    },
+    [ethersProvider]
+  )
+  return { allowance: callback, isLoading, error }
 }
 
 export const useApprove = () => {
