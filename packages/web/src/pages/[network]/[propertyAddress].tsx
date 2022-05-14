@@ -14,6 +14,7 @@ import { Footer } from 'src/components/organisms/Footer'
 import { ResponsiveModal } from 'src/components/atoms/ResponsiveModal'
 import { ButtonWithGradient } from 'src/components/atoms/ButtonWithGradient'
 import { Container } from 'src/components/atoms/Container'
+import { LinkWithNetwork } from 'src/components/atoms/LinkWithNetwork'
 import { Header } from 'src/components/organisms/Header'
 import { PropertyStats } from 'src/components/organisms/PropertyStats'
 import PropertySupporters from 'src/components/organisms/PropertySupporters'
@@ -25,7 +26,6 @@ import {
   usePropertyName
 } from 'src/fixtures/dev-kit/hooks'
 import { useGetPropertyAuthenticationQuery } from '@dev/graphql'
-import { useGetPropertytInformation } from 'src/fixtures/devprtcl/hooks'
 import {
   useGetAccount,
   useGetProperty,
@@ -172,10 +172,10 @@ const Author = ({ propertyAddress }: { propertyAddress: string }) => {
   return authorAddress ? (
     <AuthorContainer>
       <h2>
-        Created by <Link href={`/author/${authorAddress}`}>{dataAuthor?.name || authorAddress}</Link>
+        Created by <Link href={`/user/${authorAddress}`}>{dataAuthor?.name || authorAddress}</Link>
       </h2>
       <Flex>
-        <Link passHref href="/author/[accountAddress]" as={`/author/${authorAddress}`}>
+        <Link passHref href="/user/[accountAddress]" as={`/user/${authorAddress}`}>
           <a>
             <div style={{ width: '150px' }}>
               <Avatar size={'150'} accountAddress={authorAddress} />
@@ -372,7 +372,6 @@ const PropertyAddressDetail = (_: Props) => {
   const { apy, creators } = useAPY()
   const { data } = useGetPropertyAuthenticationQuery({ variables: { propertyAddress }, skip: !isL1 })
   const { data: dataProperty } = useGetProperty(propertyAddress)
-  const { data: propertyInformation } = useGetPropertytInformation(isL1 ? propertyAddress : undefined)
   /* eslint-disable react-hooks/exhaustive-deps */
   // FYI: https://github.com/facebook/react/pull/19062
   const { data: includedAssetListL2 } = useGetAssetsByProperties(propertyAddress)
@@ -385,6 +384,10 @@ const PropertyAddressDetail = (_: Props) => {
   )
   const { name: network } = useDetectChain(nonConnectedEthersProvider)
   const isDeny = isDenyProperty(network, propertyAddress)
+
+  const isAuthor = useMemo(() => {
+    return (loggedInWallet && authorAddress && loggedInWallet === authorAddress) || false
+  }, [loggedInWallet, authorAddress])
 
   return isDeny ? (
     <Error statusCode={404} />
@@ -403,7 +406,7 @@ const PropertyAddressDetail = (_: Props) => {
               <TabsGrid>
                 <div>
                   <PropertyAbout
-                    isAuthor={loggedInWallet === authorAddress}
+                    isAuthor={isAuthor}
                     dataProperty={dataProperty ? dataProperty : ({} as DevForAppsProperty)}
                     authorAddress={authorAddress || ''}
                     propertyAddress={propertyAddress}
@@ -414,13 +417,21 @@ const PropertyAddressDetail = (_: Props) => {
                       {includedAssetList?.map((asset: any, index: any) => (
                         <AssetListItem key={index}>{asset}</AssetListItem>
                       ))}
-                      {propertyInformation?.author?.address === loggedInWallet && (
-                        <Link href={'/create/[property]'} as={`/create/${propertyAddress}`}>
+                      {isAuthor && isL1 && (
+                        <LinkWithNetwork href={'/create/[property]'} as={`/create/${propertyAddress}`}>
                           <AddAsset>
                             <PlusOutlined />
                             <span>Add asset</span>
                           </AddAsset>
-                        </Link>
+                        </LinkWithNetwork>
+                      )}
+                      {isAuthor && !isL1 && (
+                        <a href={'https://niwa.xyz'}>
+                          <AddAsset>
+                            <PlusOutlined />
+                            <span>Add asset</span>
+                          </AddAsset>
+                        </a>
                       )}
                     </AssetList>
                   </AssetsSection>
